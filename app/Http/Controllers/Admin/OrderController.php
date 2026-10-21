@@ -1521,7 +1521,20 @@ class OrderController extends Controller
         $response['message'] = 'Successfully Delete Order';
         return response()->json($response);
     }
-     public function import(Request $request){
+     /** Convert an acknowledged courier shipment into Completed + stock deduction. */
+    private function finalizeCourierShipment(Order $order, int $courierId, $consignmentId, $trackingCode): ?string
+    {
+        try {
+            app(OrderStockService::class)->completeCourierOrder(
+                $order, $courierId, $consignmentId, $trackingCode
+            );
+            return null;
+        } catch (\RuntimeException $exception) {
+            return $exception->getMessage();
+        }
+    }
+
+    public function import(Request $request){
         $type = $request->query('type');
         $ids = $request->query('ids');
         $orders = Order::whereIn('id', explode(',', $ids))->get();
@@ -1543,6 +1556,7 @@ class OrderController extends Controller
             $data           = [];
             $orderMap       = [];
             $successCount   = 0;
+            $queuedStockQuantities = [];
 
             // Do not depend only on a legacy hard-coded courier ID.
             $steadfastCourierId = Courier::where('courierName', 'like', '%Stead%')->value('id') ?: 29;
@@ -1550,9 +1564,14 @@ class OrderController extends Controller
             foreach ($orders as $order) {
                 // Already synced locally: never send the same parcel again.
                 if (!empty($order->consignment_id) || !empty($order->tracking_code)) {
-                    $order->courier_id = $steadfastCourierId;
-                    $order->status = 'Completed';
-                    $order->save();
+                    $stockError = $this->finalizeCourierShipment(
+                        $order, (int) $steadfastCourierId, $order->consignment_id, $order->tracking_code
+                    );
+                    if ($stockError !== null) {
+                        $results[] = ['order_id' => $order->id, 'invoice' => $order->invoiceID,
+                            'error_code' => 'COURIER_STOCK_SYNC', 'message' => $stockError];
+                        continue;
+                    }
                     $successCount++;
                     $successResults[] = [
                         'order_id' => $order->id,
@@ -1603,6 +1622,26 @@ class OrderController extends Controller
                         'error' => 'SteadFast recipient address is empty.',
                     ];
                     continue;
+                }
+
+                // Prevent sending parcels whose quantities cannot be fulfilled.
+                // Also consider other orders queued in this SteadFast batch.
+                try {
+                    $needed = app(OrderStockService::class)->checkAvailability(
+                        $order, $queuedStockQuantities
+                    );
+                } catch (\RuntimeException $exception) {
+                    $results[] = [
+                        'order_id' => $order->id,
+                        'invoice' => $order->invoiceID,
+                        'error_code' => 'INSUFFICIENT_STOCK',
+                        'message' => $exception->getMessage(),
+                    ];
+                    continue;
+                }
+                foreach ($needed as $productId => $requiredQty) {
+                    $queuedStockQuantities[$productId] =
+                        (int) ($queuedStockQuantities[$productId] ?? 0) + $requiredQty;
                 }
 
                 $invoice = (string) $order->invoiceID;
@@ -1712,11 +1751,15 @@ class OrderController extends Controller
                     $isSuccess = $itemStatus === 'success' || !empty($consignmentId) || !empty($trackingCode);
 
                     if ($isSuccess) {
-                        $order->courier_id = $steadfastCourierId;
-                        $order->status = 'Completed';
-                        $order->consignment_id = $consignmentId;
-                        $order->tracking_code = $trackingCode;
-                        $order->save();
+                        $stockError = $this->finalizeCourierShipment(
+                            $order, (int) $steadfastCourierId, $consignmentId, $trackingCode
+                        );
+                        if ($stockError !== null) {
+                            $results[] = ['order_id' => $order->id, 'invoice' => $invoice,
+                                'error_code' => 'COURIER_STOCK_SYNC', 'message' => $stockError,
+                                'consignment_id' => $consignmentId, 'tracking_code' => $trackingCode];
+                            continue;
+                        }
                         $successCount++;
                         $successResults[] = [
                             'order_id' => $order->id,
@@ -1775,11 +1818,15 @@ class OrderController extends Controller
                         }
 
                         if (!empty($recoveredCid) || !empty($recoveredTracking)) {
-                            $order->courier_id = $steadfastCourierId;
-                            $order->status = 'Completed';
-                            $order->consignment_id = $recoveredCid;
-                            $order->tracking_code = $recoveredTracking;
-                            $order->save();
+                            $stockError = $this->finalizeCourierShipment(
+                                $order, (int) $steadfastCourierId, $recoveredCid, $recoveredTracking
+                            );
+                            if ($stockError !== null) {
+                                $results[] = ['order_id' => $order->id, 'invoice' => $invoice,
+                                    'error_code' => 'COURIER_STOCK_SYNC', 'message' => $stockError,
+                                    'consignment_id' => $recoveredCid, 'tracking_code' => $recoveredTracking];
+                                continue;
+                            }
                             $successCount++;
                             $successResults[] = [
                                 'order_id' => $order->id,
@@ -1878,12 +1925,15 @@ class OrderController extends Controller
                             $retrySuccess = $retryStatus === 'success' || !empty($retryCid) || !empty($retryTracking);
 
                             if ($retrySuccess) {
-                                $order->courier_id = $steadfastCourierId;
-                                $order->status = 'Completed';
-                                $order->consignment_id = $retryCid;
-                                $order->tracking_code = $retryTracking;
-                                $order->save();
-
+                                $stockError = $this->finalizeCourierShipment(
+                                    $order, (int) $steadfastCourierId, $retryCid, $retryTracking
+                                );
+                                if ($stockError !== null) {
+                                    $results[] = ['order_id' => $order->id, 'invoice' => $invoice,
+                                        'error_code' => 'COURIER_STOCK_SYNC', 'message' => $stockError,
+                                        'consignment_id' => $retryCid, 'tracking_code' => $retryTracking];
+                                    continue;
+                                }
                                 $successCount++;
                                 $successResults[] = [
                                     'order_id' => $order->id,
@@ -1967,8 +2017,36 @@ class OrderController extends Controller
             $pathaoCourierId = $pathaoCourier->id;
         
             foreach ($orders as $order) {
+                // Existing tracking identifies a remote shipment: reconcile, never re-send.
+                if (!empty($order->consignment_id) || !empty($order->tracking_code)) {
+                    $stockError = $this->finalizeCourierShipment(
+                        $order, (int) $pathaoCourierId, $order->consignment_id, $order->tracking_code
+                    );
+                    $results[] = [
+                        'order_id' => $order->id,
+                        'response' => $stockError === null
+                            ? ['type' => 'success', 'local_update' => 'Already synced; stock reconciled.']
+                            : ['type' => 'error', 'local_update_error' => $stockError],
+                    ];
+                    continue;
+                }
+                try {
+                    app(OrderStockService::class)->checkAvailability($order);
+                } catch (\RuntimeException $exception) {
+                    $results[] = ['order_id' => $order->id, 'response' => [
+                        'type' => 'error', 'error' => $exception->getMessage(),
+                    ]];
+                    continue;
+                }
+
                 $customer  = Customer::where('order_id', $order->id)->first();
                 $products  = OrderProducts::where('order_id', $order->id)->get();
+                if (!$customer) {
+                    $results[] = ['order_id' => $order->id, 'response' => [
+                        'type' => 'error', 'error' => 'Customer information not found.',
+                    ]];
+                    continue;
+                }
         
                 $description = '';
                 $quantity    = 0;
@@ -2013,13 +2091,17 @@ class OrderController extends Controller
         
                 // Update local order if success
                 if (isset($resData['type']) && $resData['type'] == 'success') {
-                    $order->courier_id     = $pathaoCourierId;
-                    $order->status         = 'Completed';
-                    $order->consignment_id = $resData['data']['consignment_id'] ?? null;
-                    $order->tracking_code  = $resData['data']['merchant_order_id'] ?? null;
-                    $order->update();
-        
-                    $resData['local_update'] = 'Order updated successfully';
+                    $stockError = $this->finalizeCourierShipment(
+                        $order, (int) $pathaoCourierId,
+                        $resData['data']['consignment_id'] ?? null,
+                        $resData['data']['merchant_order_id'] ?? null
+                    );
+                    if ($stockError !== null) {
+                        $resData['local_update_error'] = $stockError;
+                        $resData['type'] = 'error';
+                    } else {
+                        $resData['local_update'] = 'Order Completed and stock deducted successfully';
+                    }
                 }
         
                 $results[] = [

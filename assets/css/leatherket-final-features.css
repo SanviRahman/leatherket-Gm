@@ -179,3 +179,43 @@
         line-height: 1.3;
     }
 }
+
+/* 2026-10-15: Desktop AJAX mini-cart dropdown must sit in front of the
+   category navbar and page content. Keep V1 mobile positioning unchanged. */
+@media (min-width: 992px) {
+    .lk-sticky-site-nav {
+        position: relative; /* remains non-sticky on desktop */
+        z-index: 20; /* above product content, below Bootstrap modals */
+    }
+    .lk-sticky-site-nav .section-header {
+        position: relative;
+        z-index: 30;
+        overflow: visible;
+    }
+    .lk-sticky-site-nav .header-main,
+    .lk-sticky-site-nav .header-main > .container,
+    .lk-sticky-site-nav .header-cart-column,
+    .lk-sticky-site-nav .header-cart-column .widgets-wrap,
+    .lk-sticky-site-nav .header-cart-column .widget-header {
+        overflow: visible;
+    }
+    .lk-sticky-site-nav .leatherket-category-navbar {
+        position: relative;
+        z-index: 1;
+    }
+    .section-header #cart_items {
+        position: relative;
+    }
+    .section-header #cart_items > .dropdown-menu {
+        z-index: 1050;
+        width: 380px;
+        max-width: calc(100vw - 32px);
+        max-height: calc(100vh - 170px);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+    .section-header #cart_items .dropdown-cart-items {
+        max-height: min(340px, 42vh);
+        overflow-y: auto;
+    }
+}

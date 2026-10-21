@@ -390,7 +390,7 @@ class CartController extends Controller
                 }
 
                 // Recheck current stock before saving a pending order, without
-                // reserving/deducting anything. Final allocation happens on Customer Confirm.
+                // reserving/deducting anything. Final stock deduction happens on Completed.
                 foreach ($requestedQuantities as $productId => $quantity) {
                     $liveProduct = Product::visible()->with('stockRecord')->findOrFail($productId);
                     if ($liveProduct->isSoldOut() || $quantity > $liveProduct->availableStock()) {
@@ -442,7 +442,7 @@ class CartController extends Controller
                     $line->save();
                 }
 
-                // Stock is reduced only when Admin marks an order Customer Confirm.
+                // Stock is reduced only when an order is marked Completed.
                 // Do NOT allocate/deduct inventory on checkout submission.
 
                 $notification = new Notification();

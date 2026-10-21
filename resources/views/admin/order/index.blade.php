@@ -145,8 +145,8 @@
                                         <a class="dropdown-item btn-change-status" data-status="On Hold" href="#"><i class="far fa-stop-circle mr-2 font-18 text-muted vertical-middle"></i>On Hold</a>
                                         <a class="dropdown-item btn-change-status"  data-status="Payment Pending" href="#"><i class="fe-tag mr-2 font-18 text-muted vertical-middle"></i>Payment Pending</a>
                                         <a class="dropdown-item btn-change-status" data-status="Canceled" href="#"><i class="fe-trash-2 mr-2 font-18 text-muted vertical-middle"></i>Canceled</a>
-                                        <a class="dropdown-item btn-change-status" data-status="Customer Confirm" href="#"><i class="fe-check-circle mr-2 font-18 text-muted vertical-middle"></i>Customer Confirm (deduct stock)</a>
-                                        <a class="dropdown-item btn-change-status" data-status="Completed" href="#"><i class="fe-check-circle mr-2 font-18 text-muted vertical-middle"></i>Completed</a>
+                                        <a class="dropdown-item btn-change-status" data-status="Customer Confirm" href="#"><i class="fe-check-circle mr-2 font-18 text-muted vertical-middle"></i>Customer Confirm</a>
+                                        <a class="dropdown-item btn-change-status" data-status="Completed" href="#"><i class="fe-check-circle mr-2 font-18 text-muted vertical-middle"></i>Completed (deduct stock)</a>
                                     </div>
                                 </div>
                                 <div class="btn-group dropdown ml-2 float-right">

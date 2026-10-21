@@ -28,7 +28,7 @@
     <link rel="stylesheet" href="{{ asset('assets/css/leatherket-collections.css') }}?v=20261014-2x2-grid">
     <link rel="stylesheet" href="{{ asset('assets/css/leatherket-product-cards.css') }}?v=2">
     <link href="{{ asset('assets/css/leatherket-font-sizes.css') }}?v=20261011-readable2" rel="stylesheet" type="text/css" />
-    <link href="{{ asset('assets/css/leatherket-final-features.css') }}?v=20261013-mobile-polish" rel="stylesheet" type="text/css" />
+    <link href="{{ asset('assets/css/leatherket-final-features.css') }}?v=20261015-desktop-cart-layer-fix" rel="stylesheet" type="text/css" />
     {!! Settings::get('facebook_pixels') !!}
     <!-- CSS for scrolling ticker -->
 
