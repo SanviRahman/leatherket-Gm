@@ -121,15 +121,27 @@ class CartController extends Controller
         }
          // Retrieve selected color and size names if applicable
         if ($request->color_id) {
-            $color = Color::find($request->color_id);
+            $color = $product->colors->firstWhere('id', (int) $request->color_id);
+            if (!$color) {
+                return response()->json(['status' => 'error', 'message' => 'The selected color is unavailable for this product.'], 422);
+            }
         }
         $price = $product->price();
         if ($request->size_id) {
-            $size = Size::find($request->size_id);
+            $size = $product->sizes->firstWhere('id', (int) $request->size_id);
+            if (!$size) {
+                return response()->json(['status' => 'error', 'message' => 'The selected size is unavailable for this product.'], 422);
+            }
         }
         if ($request->option_id) {
-            $option = Option::find($request->option_id);
-            $price = DB::table('option_product')->where('product_id', $product->id)->where('option_id', $option->id)->value('price');
+            $option = $product->options->firstWhere('id', (int) $request->option_id);
+            if (!$option) {
+                return response()->json(['status' => 'error', 'message' => 'The selected option is unavailable for this product.'], 422);
+            }
+            $optionPrice = $option->pivot->price;
+            if ($optionPrice !== null && is_numeric($optionPrice)) {
+                $price = (float) $optionPrice;
+            }
         }
     
         // Add product to the cart with color and size if applicable
@@ -150,7 +162,11 @@ class CartController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'Product added to cart successfully.',
-            'cart' => Cart::content()
+            'cart' => Cart::content(),
+            'available_stock' => $product->availableStock(),
+            'in_cart' => (int) Cart::content()->filter(function ($item) use ($product) {
+                return (int) $item->id === (int) $product->id;
+            })->sum('qty')
         ]);
     }
 
@@ -222,9 +238,37 @@ class CartController extends Controller
 
     public function updateQuantity(Request $request)
     {
-        session_start();
-        if($request->quantity > 0){
-            Cart::update($request->key, $request->quantity);
+        // Existing checkout shipping/discount changes request a summary refresh with (0, 0).
+        // This is read-only and must not be treated as a stock-changing request.
+        if ((string) $request->input('key', '') === '0' && (string) $request->input('quantity', '') === '0') {
+            if (session_status() !== PHP_SESSION_ACTIVE) {
+                session_start();
+            }
+            return $this->renderCart();
+        }
+        $validated = $request->validate([
+            'key' => 'required|string',
+            'quantity' => 'required|integer|min:1|max:10',
+        ]);
+        $item = Cart::get($validated['key']);
+        if (!$item) {
+            return response()->json(['message' => 'Cart item not found.'], 404);
+        }
+        $product = Product::visible()->with('stockRecord')->find($item->id);
+        if (!$product || $product->isSoldOut()) {
+            return response()->json(['message' => 'This product is no longer available.'], 422);
+        }
+        $otherQuantity = Cart::content()->filter(function ($line) use ($item) {
+            return (int) $line->id === (int) $item->id && $line->rowId !== $item->rowId;
+        })->sum('qty');
+        if ((int) $validated['quantity'] + (int) $otherQuantity > $product->availableStock()) {
+            return response()->json([
+                'message' => 'Only ' . $product->availableStock() . ' item(s) are in stock for this product.'
+            ], 422);
+        }
+        Cart::update($item->rowId, (int) $validated['quantity']);
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            session_start();
         }
          // Calculate delivery discount if any product has free delivery
         $freeDeliveryDiscount = 0;
@@ -238,7 +282,7 @@ class CartController extends Controller
         <aside class="card">
             <article class="card-body">
                 <header class="mb-4">
-                    <h4 class="card-title" style="font-size: 16px;">আপনার অর্ডার</h4>
+                    <h4 class="card-title" style="font-size: 16px;">আপনার অর্ডার (<?php echo Cart::count(); ?> items)</h4>
                 </header>
                 <div class="row">
                     <div class="table-responsive bg-white">
@@ -265,12 +309,13 @@ class CartController extends Controller
                                     </td>
 
                                     <td class="product-name">
-                                        <span class="d-block"><?php echo $item->model->productName ?></span>
+                                        <span class="d-block"><?php echo e($item->model->productName) ?></span>
+                                        <small class="lk-cart-stock">Stock: <?php echo $item->model->isSoldOut() ? 0 : $item->model->availableStock(); ?> pcs</small>
                                            
                                         <?php if($item->options->colorName){ ?>
                                             <small class="text-muted">Color: <?php echo $item->options->colorName; ?></small>
                                         <?php } ?>
-                                        <?php if($item->options->colorName){ ?>
+                                        <?php if($item->options->sizeName){ ?>
                                             <small class="text-muted">Size: <?php echo $item->options->sizeName; ?></small>
                                         <?php } ?>
                                         <?php if($item->options->optionName){ ?>
@@ -287,14 +332,14 @@ class CartController extends Controller
                                             <div class="input-group-prepend">
                                                 <button class="btn btn-light btn-number" type="button" data-type="plus" data-field="quantity[<?php echo $item->id ?>]"> + </button>
                                             </div>
-                                            <input type="text" name="quantity[<?php echo $item->id ?>]" class="form-control input-number" placeholder="1" value="<?php echo $item->qty ?>" min="1" max="10" onchange="updateQuantity('<?php echo $item->rowId ?>', this)">
+                                            <input type="text" name="quantity[<?php echo $item->id ?>]" class="form-control input-number" placeholder="1" value="<?php echo $item->qty ?>" min="1" max="<?php echo max(1, min(10, $item->model->availableStock())); ?>" onchange="updateQuantity('<?php echo $item->rowId ?>', this)">
                                             <div class="input-group-append">
                                                 <button class="btn btn-light btn-number" type="button" data-type="minus"  data-field="quantity[<?php echo $item->id ?>]"> − </button>
                                             </div>
                                         </div>
                                     </td>
                                     <td class="product-total">
-                                        <span>TK <?php echo Cart::subtotal('0','','')?></span>
+                                        <span>TK <?php echo number_format((float) $item->price * (int) $item->qty, 2); ?></span>
                                     </td>
 
                                 </tr>
@@ -758,9 +803,25 @@ class CartController extends Controller
             session_start();
         }
 
-        if ($request->filled('key') && (int) $request->input('quantity', 0) > 0) {
-            Cart::update($request->input('key'), (int) $request->input('quantity'));
+        if ((string) $request->input('key', '') === '' && (string) $request->input('quantity', '') === '0') {
+            return $this->renderCampaignCart();
         }
+        $data = $request->validate([
+            'key' => 'required|string',
+            'quantity' => 'required|integer|min:1|max:10',
+        ]);
+        $item = Cart::get($data['key']);
+        if (!$item) {
+            return response()->json(['status' => 'error', 'message' => 'Cart item not found.'], 404);
+        }
+        $product = Product::visible()->with('stockRecord')->find($item->id);
+        $otherQuantity = Cart::content()->filter(function ($line) use ($item) {
+            return (int) $line->id === (int) $item->id && $line->rowId !== $item->rowId;
+        })->sum('qty');
+        if (!$product || $product->isSoldOut() || (int) $data['quantity'] + (int) $otherQuantity > $product->availableStock()) {
+            return response()->json(['status' => 'error', 'message' => 'Not enough stock for this product.'], 422);
+        }
+        Cart::update($item->rowId, (int) $data['quantity']);
 
         return $this->renderCampaignCart();
     }
@@ -871,7 +932,7 @@ class CartController extends Controller
         <aside class="card">
             <article class="card-body">
                 <header class="mb-4">
-                    <h4 class="card-title" style="font-size: 16px;">আপনার অর্ডার</h4>
+                    <h4 class="card-title" style="font-size: 16px;">আপনার অর্ডার (<?php echo Cart::count(); ?> items)</h4>
                 </header>
                 <div class="row">
                     <div class="table-responsive bg-white">
@@ -898,7 +959,8 @@ class CartController extends Controller
                                         </td>
     
                                         <td class="product-name">
-                                            <span class="d-block"><?php echo $item->model->productName; ?></span>
+                                            <span class="d-block"><?php echo e($item->model->productName); ?></span>
+                                            <small class="lk-cart-stock">Stock: <?php echo $item->model->isSoldOut() ? 0 : $item->model->availableStock(); ?> pcs</small>
                                             <?php if ($item->options->colorName){ ?>
                                                 <small class="text-muted">Color: <?php echo $item->options->colorName; ?>,</small>
                                             <?php } ?>
@@ -913,7 +975,7 @@ class CartController extends Controller
                                         </td>
     
                                         <td class="product-price">
-                                            <span class="d-block">TK <?php echo $item->model->price(); ?></span>
+                                            <span class="d-block">TK <?php echo number_format((float) $item->price, 2); ?></span>
                                         </td>
     
                                         <td class="product-quantity">
@@ -921,14 +983,14 @@ class CartController extends Controller
                                                 <div class="input-group-prepend">
                                                     <button class="btn btn-light btn-number" type="button" data-type="plus" data-field="quantity[<?php echo $item->id; ?>]"> + </button>
                                                 </div>
-                                                <input type="text" name="quantity[<?php echo $item->id; ?>]" class="form-control input-number" value="<?php echo $item->qty; ?>" min="1" max="10" onchange="updateQuantity('<?php echo $item->rowId; ?>', this)">
+                                                <input type="text" name="quantity[<?php echo $item->id; ?>]" class="form-control input-number" value="<?php echo $item->qty; ?>" min="1" max="<?php echo max(1, min(10, $item->model->availableStock())); ?>" onchange="updateQuantity('<?php echo $item->rowId; ?>', this)">
                                                 <div class="input-group-append">
                                                     <button class="btn btn-light btn-number" type="button" data-type="minus" data-field="quantity[<?php echo $item->id; ?>]"> − </button>
                                                 </div>
                                             </div>
                                         </td>
                                         <td class="product-total">
-                                            <span>TK <?php echo $item->total(); ?></span>
+                                            <span>TK <?php echo number_format((float) $item->price * (int) $item->qty, 2); ?></span>
                                         </td>
                                     </tr>
                                 <?php } ?>
@@ -940,13 +1002,20 @@ class CartController extends Controller
             <article class="card-body border-top">
                 <dl class="row">
                     <dt class="col-sm-8">Subtotal:</dt>
-                    <dd class="col-sm-4 text-right"><strong>TK <?php echo Cart::subtotal(); ?></strong></dd>
-    
+                    <dd class="col-sm-4 text-right"><strong>TK <?php echo Cart::subtotal('2', '.', ''); ?></strong></dd>
+
+                    <?php
+                        $rawDelivery = isset($_SESSION['delivery']) ? (float) $_SESSION['delivery'] : 0;
+                        $freeShipping = Cart::content()->contains(function ($line) {
+                            return $line->model && (int) $line->model->isFreeDelivery === 1;
+                        });
+                        $chargedDelivery = $freeShipping ? 0 : $rawDelivery;
+                    ?>
                     <dt class="col-sm-8">Delivery charge:</dt>
-                    <dd class="col-sm-4 text-danger text-right"><strong>TK <?php echo session('delivery', 0); ?></strong></dd>
-    
+                    <dd class="col-sm-4 text-danger text-right"><strong>TK <?php echo number_format($chargedDelivery, 2); ?></strong></dd>
+
                     <dt class="col-sm-8">Total:</dt>
-                    <dd class="col-sm-4 text-right"><strong class="h5 text-dark">TK <?php echo Cart::subtotal() + session('delivery', 0); ?></strong></dd>
+                    <dd class="col-sm-4 text-right"><strong class="h5 text-dark">TK <?php echo number_format((float) Cart::subtotal('2', '.', '') + $chargedDelivery, 2); ?></strong></dd>
                 </dl>
             </article>
             <script type="text/javascript">

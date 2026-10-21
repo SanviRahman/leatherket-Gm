@@ -1,5 +1,5 @@
 <div class="tile">
-    <form action="{{ url('admin/setting') }}" method="POST" role="form">
+    <form action="{{ url('admin/setting?tab=footer') }}" method="POST" role="form">
         @csrf
         <h3 class="tile-title">Copy Right Footer</h3>
         <hr>
@@ -37,6 +37,14 @@
                        maxlength="100" placeholder="e.g. 10 am - 6 pm"
                        value="{{ old('footer_open_hours', Settings::get('footer_open_hours')) }}">
                 <small class="form-text text-muted">Shows as: Sat-Thu (10 am - 6 pm). Leave both blank to hide.</small>
+            </div>
+            <div class="form-group">
+                <label for="lk_newsletter_enabled"><strong>Show Newsletter on Website</strong></label>
+                <select id="lk_newsletter_enabled" name="lk_newsletter_enabled" class="form-control">
+                    <option value="1" {{ old('lk_newsletter_enabled', Settings::get('lk_newsletter_enabled') === '0' ? '0' : '1') === '1' ? 'selected' : '' }}>ON - Show Newsletter</option>
+                    <option value="0" {{ old('lk_newsletter_enabled', Settings::get('lk_newsletter_enabled') === '0' ? '0' : '1') === '0' ? 'selected' : '' }}>OFF - Hide Newsletter</option>
+                </select>
+                <small class="form-text text-muted">OFF hides the entire footer newsletter section and blocks new subscriptions.</small>
             </div>
             <div class="form-group">
                 <label for="footer_newsletter_text">Newsletter Description</label>

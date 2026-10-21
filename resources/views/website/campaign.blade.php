@@ -1001,10 +1001,8 @@
 
                 showFrontendAlert('success', 'Successfully Product Removed from Cart');
                 updateNavCart();
-                updateQuantity(key,0);
-                if(response['reload'] === 'true'){
-                    location.reload();
-                }
+                // Campaign order rows remove via the product selector; refresh if an old remove button calls this.
+                location.reload();
 
             }
         });
@@ -1179,12 +1177,17 @@
         var quantity = (element && typeof element === 'object' && typeof element.value !== 'undefined') ? element.value : 0;
         var trackThisUpdate = (typeof shouldTrack === 'undefined') ? true : shouldTrack;
 
-        $.get("{{ route('campaign.cart.quantity') }}", {
+        $.post("{{ route('campaign.cart.quantity') }}", {
             _token: '{{ csrf_token() }}',
             key: key,
             quantity: quantity
         }, function(data){
             refreshCampaignOrderDetails(data, 'quantity_change', trackThisUpdate);
+        }).fail(function(xhr) {
+            showFrontendAlert('error', (xhr.responseJSON && xhr.responseJSON.message) || 'Stock quantity is unavailable.');
+            $.post("{{ route('campaign.cart.quantity') }}", { _token: '{{ csrf_token() }}', key: '', quantity: 0 }, function(html) {
+                refreshCampaignOrderDetails(html, 'quantity_change', false);
+            });
         });
     }
 

@@ -29,6 +29,7 @@
     <link rel="stylesheet" href="{{ asset('assets/css/leatherket-product-cards.css') }}?v=2">
     <link href="{{ asset('assets/css/leatherket-font-sizes.css') }}?v=20261011-readable2" rel="stylesheet" type="text/css" />
     <link href="{{ asset('assets/css/leatherket-final-features.css') }}?v=20261015-desktop-cart-layer-fix" rel="stylesheet" type="text/css" />
+    <link href="{{ asset('assets/css/leatherket-inventory-newsletter.css') }}?v=20261021-1" rel="stylesheet" type="text/css" />
     {!! Settings::get('facebook_pixels') !!}
     <!-- CSS for scrolling ticker -->
 
@@ -143,25 +144,7 @@
                         <div class="widget-header">
 
                             <div class="nav-cart-box dropdown" id="cart_items">
-                                <span class="badge badge-pill badge-danger notify">0</span>
-                                <a href="" class="icon icon-xs rounded-circle border" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
-                                    <i class="fa fa-shopping-cart d-inline-block nav-box-icon desktop-cart-icon" aria-hidden="true"></i>
-                                    <svg class="mobile-cart-bag-icon d-lg-none" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                                        <path d="M6.7 8.7H17.3L18.3 20H5.7L6.7 8.7Z" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linejoin="round"/>
-                                        <path d="M9 9V7.2C9 5.45 10.34 4 12 4C13.66 4 15 5.45 15 7.2V9" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round"/>
-                                    </svg>
-                                    <span class="badge badge-pill badge-danger notify">0</span>
-                                </a>
-                                <ul class="dropdown-menu dropdown-menu-right px-0" x-placement="bottom-end" style="position: absolute; will-change: transform; top: 0px; left: 0px; transform: translate3d(-328px, 32px, 0px);">
-
-                                    <li>
-                                        <div class="dropdown-cart px-0">
-                                            <div class="dc-header">
-                                                <h4 class="text-center py-2">Empty Cart</h4>
-                                            </div>
-                                        </div>
-                                    </li>
-                                </ul>
+                                @include('partials.mini_cart')
                             </div>
 
 
@@ -229,7 +212,8 @@
 
 <footer class="section-footer leatherket-store-footer" id="leatherket-footer">
     <div class="leatherket-footer-container">
-        <div class="leatherket-footer-grid">
+        <div class="leatherket-footer-grid {{ Settings::get('lk_newsletter_enabled') === '0' ? 'lk-footer-without-newsletter' : '' }}">
+            @if(Settings::get('lk_newsletter_enabled') !== '0')
             <section class="leatherket-newsletter" aria-labelledby="leatherket-newsletter-heading">
                 <h2 id="leatherket-newsletter-heading">Newsletter</h2>
                 <p id="leatherket-newsletter-description">{{ Settings::get('footer_newsletter_text') ?: 'Subscribe for exclusive offers, new arrivals and updates from Leatherket.' }}</p>
@@ -247,6 +231,7 @@
                     <p class="leatherket-newsletter-error" role="alert">{{ $message }}</p>
                 @enderror
             </section>
+            @endif
 
             <section class="leatherket-footer-links" aria-label="Quick links">
                 <?php $footer = Menu::getByName('Footer Menu'); ?>
@@ -385,9 +370,10 @@
 
                 showFrontendAlert('success', 'Successfully Product Removed from Cart');
                 updateNavCart();
-                updateQuantity(key,0);
                 if(response['reload'] === 'true'){
                     location.reload();
+                } else if ($('.orderDetails').length) {
+                    updateQuantity(0, { value: 0 });
                 }
 
             }
@@ -395,9 +381,23 @@
     }
 
     function updateQuantity(key, element){
-        $.get("{{url('/updateQuantity')}}", { _token:'30aK3OPPMnzZeq8BKYZGsidbBTm5VsnwPGhJdtPl', key:key, quantity: element.value}, function(data){
+        var quantity = (element && typeof element === 'object' && typeof element.value !== 'undefined') ? element.value : element;
+        $.post("{{ route('updateQuantity') }}", {
+            _token: '{{ csrf_token() }}',
+            key: key,
+            quantity: quantity
+        }, function(data){
             updateNavCart();
             $('.orderDetails').html(data);
+        }).fail(function(xhr) {
+            showFrontendAlert('error', (xhr.responseJSON && xhr.responseJSON.message) || 'Unable to update cart quantity.');
+            // Restore server state without erasing checkout contact inputs.
+            $.post("{{ route('updateQuantity') }}", {
+                _token: '{{ csrf_token() }}', key: 0, quantity: 0
+            }, function(html) {
+                $('.orderDetails').html(html);
+                updateNavCart();
+            });
         });
     }
     function updateCartOptions(key, value, optionType) {
@@ -431,6 +431,14 @@
             console.log(data.message);
             showFrontendAlert(data.status, data.message);
             updateNavCart();
+            if (data.status === 'success' && $('#lk-detail-cart-count').length) {
+                var remaining = Math.max(0, Number(data.available_stock) - Number(data.in_cart));
+                $('#lk-detail-cart-count').text('In your cart: ' + data.in_cart + ' pcs | Can add: ' + remaining + ' pcs');
+                $('#leatherket-product-quantity').attr('max', Math.max(1, Math.min(10, remaining))).val(1);
+                if (remaining === 0) {
+                    $('.leatherket-purchase-panel .lk-qty-btn, .leatherket-purchase-panel .lk-qty-input, .leatherket-purchase-buttons button').prop('disabled', true);
+                }
+            }
         }).fail(function (xhr) {
             showFrontendAlert('error', (xhr.responseJSON && xhr.responseJSON.message) || 'Could not add product to cart.');
         });

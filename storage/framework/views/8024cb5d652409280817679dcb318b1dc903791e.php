@@ -64,8 +64,11 @@
 <?php $__env->startPush('js'); ?>
     <script>
         $(document).ready(function(){
-            if (new URLSearchParams(window.location.search).get('tab') === 'collections') {
+            var activeTab = new URLSearchParams(window.location.search).get('tab');
+            if (activeTab === 'collections') {
                 $('a[href="#v-pills-collections"]').tab('show');
+            } else if (activeTab === 'footer') {
+                $('a[href="#v-pills-messages"]').tab('show');
             }
         });
     </script>

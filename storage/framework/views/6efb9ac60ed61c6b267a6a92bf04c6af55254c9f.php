@@ -111,31 +111,40 @@
                                 <?php endif; ?>
 
                             </div> <!-- options row -->
+                            <?php
+                                $detailStock = $product->isSoldOut() ? 0 : $product->availableStock();
+                                $detailCartCount = (int) \Gloudemans\Shoppingcart\Facades\Cart::content()->filter(function ($item) use ($product) {
+                                    return (int) $item->id === (int) $product->id;
+                                })->sum('qty');
+                                $detailAddableStock = max(0, $detailStock - $detailCartCount);
+                                $detailCannotAdd = $product->isSoldOut() || $detailAddableStock === 0;
+                            ?>
                             <div class="leatherket-purchase-panel">
                                 <div class="leatherket-inventory mb-3" role="status">
                                     <span class="lk-product-code">Product Code: <?php echo e($product->productCode); ?></span>
                                     <?php if($product->isSoldOut()): ?>
-                                        <span class="leatherket-stock-label leatherket-stock-empty"><i class="fa fa-times" aria-hidden="true"></i> Sold out</span>
+                                        <span class="leatherket-stock-label leatherket-stock-empty"><i class="fa fa-times" aria-hidden="true"></i> Stock: 0 pcs (Sold out)</span>
                                     <?php else: ?>
-                                        <span class="leatherket-stock-label"><i class="fa fa-check" aria-hidden="true"></i> Available</span>
+                                        <span class="leatherket-stock-label"><i class="fa fa-check" aria-hidden="true"></i> Available stock: <?php echo e(number_format($detailStock)); ?> pcs</span>
                                     <?php endif; ?>
+                                    <span class="leatherket-stock-extra" id="lk-detail-cart-count">In your cart: <?php echo e($detailCartCount); ?> pcs | Can add: <?php echo e($detailAddableStock); ?> pcs</span>
                                 </div>
                                 <div class="leatherket-detail-price mb-4" id="product-price"><?php echo $product->htmlPrice(); ?></div>
                                 <label for="leatherket-product-quantity" class="leatherket-quantity-label">Quantity:</label>
                                 <div class="input-group input-spinner leatherket-quantity-spinner mb-4">
                                     <div class="input-group-prepend">
-                                        <button class="btn btn-light lk-qty-btn" type="button" data-type="minus" data-field="quantity" aria-label="Decrease quantity" <?php echo e($product->isSoldOut() ? 'disabled' : ''); ?>>−</button>
+                                        <button class="btn btn-light lk-qty-btn" type="button" data-type="minus" data-field="quantity" aria-label="Decrease quantity" <?php echo e($detailCannotAdd ? 'disabled' : ''); ?>>−</button>
                                     </div>
-                                    <input type="number" id="leatherket-product-quantity" class="form-control lk-qty-input" value="1" name="quantity" min="1" max="<?php echo e(max(1, min(10, $product->availableStock()))); ?>" inputmode="numeric" aria-label="Quantity" <?php echo e($product->isSoldOut() ? 'disabled' : ''); ?>>
+                                    <input type="number" id="leatherket-product-quantity" class="form-control lk-qty-input" value="1" name="quantity" min="1" max="<?php echo e(max(1, min(10, $detailAddableStock))); ?>" inputmode="numeric" aria-label="Quantity" <?php echo e($detailCannotAdd ? 'disabled' : ''); ?>>
                                     <div class="input-group-append">
-                                        <button class="btn btn-light lk-qty-btn" type="button" data-type="plus" data-field="quantity" aria-label="Increase quantity" <?php echo e($product->isSoldOut() ? 'disabled' : ''); ?>>+</button>
+                                        <button class="btn btn-light lk-qty-btn" type="button" data-type="plus" data-field="quantity" aria-label="Increase quantity" <?php echo e($detailCannotAdd ? 'disabled' : ''); ?>>+</button>
                                     </div>
                                 </div>
                                 <div class="single-product-buttons leatherket-purchase-buttons">
-                                    <button type="button" <?php echo e($product->isSoldOut() ? 'disabled' : ''); ?> class="btn btn-primary leatherket-add-cart" onclick="addToCart(<?php echo e($product->id); ?>)">Add to cart</button>
-                                    <button type="button" <?php echo e($product->isSoldOut() ? 'disabled' : ''); ?> class="btn btn-outline-primary leatherket-buy-now" onclick="buyNow(<?php echo e($product->id); ?>)">Buy it now</button>
+                                    <button type="button" <?php echo e($detailCannotAdd ? 'disabled' : ''); ?> class="btn btn-primary leatherket-add-cart" onclick="addToCart(<?php echo e($product->id); ?>)">Add to cart</button>
+                                    <button type="button" <?php echo e($detailCannotAdd ? 'disabled' : ''); ?> class="btn btn-outline-primary leatherket-buy-now" onclick="buyNow(<?php echo e($product->id); ?>)">Buy it now</button>
                                     <?php if((int) $product->isFreeDelivery === 1): ?>
-                                        <button type="button" <?php echo e($product->isSoldOut() ? 'disabled' : ''); ?>
+                                        <button type="button" <?php echo e($detailCannotAdd ? 'disabled' : ''); ?>
 
                                                 class="btn leatherket-free-delivery-order"
                                                 onclick="buyNow(<?php echo e($product->id); ?>)">

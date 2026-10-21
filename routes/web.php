@@ -115,14 +115,14 @@ Route::get('/getProducts', 'WebsiteController@loadProducts')->name('loadProducts
 Route::resource('/checkout','CartController');
 Route::get('/mini_cart','CartController@mini_cart')->name('mini_cart');
 Route::get('/mini-cart-view','CartController@miniCart')->name('miniCart');
-Route::get('/updateQuantity','CartController@updateQuantity')->name('updateQuantity');
+Route::post('/updateQuantity','CartController@updateQuantity')->name('updateQuantity');
 Route::get('/updateDeliveryCharge','CartController@updateDeliveryCharge')->name('updateDeliveryCharge');
 Route::post('/placeOrder','CartController@placeOrder')->name('placeOrder');
 Route::post('/save-input','CartController@saveOrderInput')->name('saveOrderInput');
 Route::get('/checkout/order-received/{id}','CartController@orderRecived')->name('placeOrder');
 Route::get('/updateCartOptions', 'CartController@updateCartOptions')->name('updateCartOptions');
 Route::post('/campaign-cart/product', 'CartController@updateCampaignProduct')->name('campaign.cart.product');
-Route::get('/campaign-cart/quantity', 'CartController@updateCampaignQuantity')->name('campaign.cart.quantity');
+Route::post('/campaign-cart/quantity', 'CartController@updateCampaignQuantity')->name('campaign.cart.quantity');
 Route::get('/campaign-cart/option', 'CartController@updateCampaignOption')->name('campaign.cart.option');
 Route::post('/campaign-cart/color', 'CartController@updateCampaignColor')->name('campaign.cart.color');
 

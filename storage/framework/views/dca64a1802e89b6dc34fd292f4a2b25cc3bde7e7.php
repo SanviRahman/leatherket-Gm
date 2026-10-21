@@ -5,6 +5,10 @@
         || $product->sizes->isNotEmpty()
         || $product->options->isNotEmpty();
     $soldOut = $product->isSoldOut();
+    $stockCount = $soldOut ? 0 : $product->availableStock();
+    $cartCountForProduct = (int) \Gloudemans\Shoppingcart\Facades\Cart::content()->filter(function ($item) use ($product) {
+        return (int) $item->id === (int) $product->id;
+    })->sum('qty');
     $freeDelivery = (int) $product->isFreeDelivery === 1;
 ?>
 <article class="lk-product-card">
@@ -19,9 +23,21 @@
 
         </a>
         <div class="lk-product-card-price"><?php echo $product->htmlPrice(); ?></div>
+        <div class="lk-product-card-stock" aria-label="Stock availability">
+            <?php if($soldOut): ?>
+                <span class="lk-stock-out">Stock: 0 pcs</span>
+            <?php else: ?>
+                <span>Stock: <?php echo e(number_format($stockCount)); ?> pcs</span>
+            <?php endif; ?>
+            <?php if($cartCountForProduct > 0): ?>
+                <span class="lk-cart-item-count">In cart: <?php echo e($cartCountForProduct); ?></span>
+            <?php endif; ?>
+        </div>
     </div>
     <?php if($soldOut): ?>
         <button class="lk-product-card-action" type="button" disabled>Sold out</button>
+    <?php elseif($cartCountForProduct >= $stockCount): ?>
+        <button class="lk-product-card-action" type="button" disabled>Stock limit in cart</button>
     <?php elseif($hasVariants): ?>
         <a class="lk-product-card-action" href="<?php echo e($productUrl); ?>">
             <?php echo e($freeDelivery ? 'ফ্রী ডেলিভারিতে অর্ডার করুন' : 'অর্ডার করুন'); ?>

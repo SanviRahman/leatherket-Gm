@@ -1,0 +1,18 @@
+
+/* 2026-10-21: inventory/cart labels and compact newsletter subscribe action. */
+.lk-product-card-stock { display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:6px;font-size:13px;line-height:1.4;color:#36543a; }
+.lk-product-card-stock .lk-stock-out { color:#b4232a; }
+.lk-cart-item-count { color:#475569; }
+.leatherket-stock-extra { display:block;margin-top:6px;font-size:13px;color:#435165; }
+.lk-cart-stock { display:block;font-size:12px;color:#417146;line-height:1.5; }
+.lk-checkout-cart-count { text-align:center;font-size:15px;font-weight:600;margin:0 0 10px;color:#303a30; }
+/* Override the original 100%-width, 53px height footer action (desktop and mobile). */
+body .leatherket-newsletter-form .btn[type="submit"] {
+    width:auto;align-self:flex-start;min-height:36px;padding:7px 22px;
+    font-size:14px;line-height:1.35;border-radius:3px;
+}
+@media(max-width:767.98px) {
+    body .leatherket-newsletter-form .btn[type="submit"] { align-self:center;min-height:38px;padding:8px 24px;font-size:14px; }
+}
+
+@media (min-width:768px) { .leatherket-footer-grid.lk-footer-without-newsletter { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

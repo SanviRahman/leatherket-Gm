@@ -47,6 +47,7 @@
                                 <div class="lk-checkout-free-delivery" role="status"><i class="fa fa-truck" aria-hidden="true"></i> ফ্রী ডেলিভারি — এই অর্ডারে ডেলিভারি চার্জ ৳ ০</div>
                             @endif
                             <header class="mb-4">
+                                <div class="lk-checkout-cart-count" role="status">Total cart items: {{ Cart::count() }}</div>
                                 <p class="text-center" style="font-size: 16px;">অর্ডারটি কনফার্ম করতে আপনার নাম, ঠিকানা,
                                     মোবাইল নাম্বার, লিখে <span class="text-danger">অর্ডার কনফার্ম করুন</span> বাটনে
                                     ক্লিক করুন
@@ -181,10 +182,11 @@
                                             <td class="product-name">
                                                 
                                                 <span class="d-block">{{ $item->model->productName }}</span>
+                                                <small class="lk-cart-stock">Stock: {{ $item->model->isSoldOut() ? 0 : $item->model->availableStock() }} pcs</small>
                                                 <?php if($item->options->colorName){ ?>
                                                     <small class="text-muted" >Color: <?php echo $item->options->colorName; ?>,</small>
                                                 <?php } ?>
-                                                <?php if($item->options->colorName){ ?>
+                                                <?php if($item->options->sizeName){ ?>
                                                     <small class="text-muted">Size: <?php echo $item->options->sizeName; ?>,</small>
                                                 <?php } ?>
                                                 <?php if($item->options->optionName){ ?>
@@ -201,14 +203,14 @@
                                                     <div class="input-group-prepend">
                                                         <button class="btn btn-light btn-number" type="button" data-type="plus" data-field="quantity[{{ $item->id }}]"> + </button>
                                                     </div>
-                                                    <input type="text" name="quantity[{{ $item->id }}]" class="form-control input-number" placeholder="1" value="{{ $item->qty }}" min="1" max="10" onchange="updateQuantity('{{ $item->rowId }}', this)">
+                                                    <input type="text" name="quantity[{{ $item->id }}]" class="form-control input-number" placeholder="1" value="{{ $item->qty }}" min="1" max="{{ max(1, min(10, $item->model->availableStock())) }}" onchange="updateQuantity('{{ $item->rowId }}', this)">
                                                     <div class="input-group-append">
                                                         <button class="btn btn-light btn-number" type="button" data-type="minus"  data-field="quantity[{{ $item->id }}]"> − </button>
                                                     </div>
                                                 </div>
                                             </td>
                                             <td class="product-total">
-                                                <span>TK {{Cart::subtotal('0','','')}}</span>
+                                                <span>TK {{ number_format((float) $item->price * (int) $item->qty, 2) }}</span>
                                             </td>
 
                                         </tr>

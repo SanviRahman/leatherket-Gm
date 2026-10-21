@@ -22,7 +22,7 @@
 <aside class="card">
     <article class="card-body">
         <header class="mb-4">
-            <h4 class="card-title" style="font-size: 16px;">আপনার অর্ডার</h4>
+            <h4 class="card-title" style="font-size: 16px;">আপনার অর্ডার ({{ Cart::count() }} items)</h4>
         </header>
         <div class="row">
             <div class="table-responsive bg-white">
@@ -72,6 +72,7 @@
                                     @endif
                                 </span>
 
+                                <small class="lk-cart-stock">Stock: {{ $item->model->isSoldOut() ? 0 : $item->model->availableStock() }} pcs</small>
                                 @if($item->model->colors->isNotEmpty())
                                     <div class="mt-2 campaign-color-selector">
                                         <small class="d-block mb-1 font-weight-bold">Select Color</small>
@@ -164,7 +165,7 @@
                                     <div class="input-group-prepend">
                                         <button class="btn btn-light btn-number" type="button" data-type="plus" data-field="quantity[{{ $item->id }}]"> + </button>
                                     </div>
-                                    <input type="text" name="quantity[{{ $item->id }}]" class="form-control input-number" placeholder="1" value="{{ $item->qty }}" min="1" max="10" onchange="updateQuantity('{{ $item->rowId }}', this)">
+                                    <input type="text" name="quantity[{{ $item->id }}]" class="form-control input-number" placeholder="1" value="{{ $item->qty }}" min="1" max="{{ max(1, min(10, $item->model->availableStock())) }}" onchange="updateQuantity('{{ $item->rowId }}', this)">
                                     <div class="input-group-append">
                                         <button class="btn btn-light btn-number" type="button" data-type="minus" data-field="quantity[{{ $item->id }}]"> − </button>
                                     </div>

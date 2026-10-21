@@ -106,31 +106,40 @@
                                 @endif
 
                             </div> <!-- options row -->
+                            @php
+                                $detailStock = $product->isSoldOut() ? 0 : $product->availableStock();
+                                $detailCartCount = (int) \Gloudemans\Shoppingcart\Facades\Cart::content()->filter(function ($item) use ($product) {
+                                    return (int) $item->id === (int) $product->id;
+                                })->sum('qty');
+                                $detailAddableStock = max(0, $detailStock - $detailCartCount);
+                                $detailCannotAdd = $product->isSoldOut() || $detailAddableStock === 0;
+                            @endphp
                             <div class="leatherket-purchase-panel">
                                 <div class="leatherket-inventory mb-3" role="status">
                                     <span class="lk-product-code">Product Code: {{ $product->productCode }}</span>
                                     @if($product->isSoldOut())
-                                        <span class="leatherket-stock-label leatherket-stock-empty"><i class="fa fa-times" aria-hidden="true"></i> Sold out</span>
+                                        <span class="leatherket-stock-label leatherket-stock-empty"><i class="fa fa-times" aria-hidden="true"></i> Stock: 0 pcs (Sold out)</span>
                                     @else
-                                        <span class="leatherket-stock-label"><i class="fa fa-check" aria-hidden="true"></i> Available</span>
+                                        <span class="leatherket-stock-label"><i class="fa fa-check" aria-hidden="true"></i> Available stock: {{ number_format($detailStock) }} pcs</span>
                                     @endif
+                                    <span class="leatherket-stock-extra" id="lk-detail-cart-count">In your cart: {{ $detailCartCount }} pcs | Can add: {{ $detailAddableStock }} pcs</span>
                                 </div>
                                 <div class="leatherket-detail-price mb-4" id="product-price">{!! $product->htmlPrice() !!}</div>
                                 <label for="leatherket-product-quantity" class="leatherket-quantity-label">Quantity:</label>
                                 <div class="input-group input-spinner leatherket-quantity-spinner mb-4">
                                     <div class="input-group-prepend">
-                                        <button class="btn btn-light lk-qty-btn" type="button" data-type="minus" data-field="quantity" aria-label="Decrease quantity" {{ $product->isSoldOut() ? 'disabled' : '' }}>−</button>
+                                        <button class="btn btn-light lk-qty-btn" type="button" data-type="minus" data-field="quantity" aria-label="Decrease quantity" {{ $detailCannotAdd ? 'disabled' : '' }}>−</button>
                                     </div>
-                                    <input type="number" id="leatherket-product-quantity" class="form-control lk-qty-input" value="1" name="quantity" min="1" max="{{ max(1, min(10, $product->availableStock())) }}" inputmode="numeric" aria-label="Quantity" {{ $product->isSoldOut() ? 'disabled' : '' }}>
+                                    <input type="number" id="leatherket-product-quantity" class="form-control lk-qty-input" value="1" name="quantity" min="1" max="{{ max(1, min(10, $detailAddableStock)) }}" inputmode="numeric" aria-label="Quantity" {{ $detailCannotAdd ? 'disabled' : '' }}>
                                     <div class="input-group-append">
-                                        <button class="btn btn-light lk-qty-btn" type="button" data-type="plus" data-field="quantity" aria-label="Increase quantity" {{ $product->isSoldOut() ? 'disabled' : '' }}>+</button>
+                                        <button class="btn btn-light lk-qty-btn" type="button" data-type="plus" data-field="quantity" aria-label="Increase quantity" {{ $detailCannotAdd ? 'disabled' : '' }}>+</button>
                                     </div>
                                 </div>
                                 <div class="single-product-buttons leatherket-purchase-buttons">
-                                    <button type="button" {{ $product->isSoldOut() ? 'disabled' : '' }} class="btn btn-primary leatherket-add-cart" onclick="addToCart({{ $product->id }})">Add to cart</button>
-                                    <button type="button" {{ $product->isSoldOut() ? 'disabled' : '' }} class="btn btn-outline-primary leatherket-buy-now" onclick="buyNow({{ $product->id }})">Buy it now</button>
+                                    <button type="button" {{ $detailCannotAdd ? 'disabled' : '' }} class="btn btn-primary leatherket-add-cart" onclick="addToCart({{ $product->id }})">Add to cart</button>
+                                    <button type="button" {{ $detailCannotAdd ? 'disabled' : '' }} class="btn btn-outline-primary leatherket-buy-now" onclick="buyNow({{ $product->id }})">Buy it now</button>
                                     @if((int) $product->isFreeDelivery === 1)
-                                        <button type="button" {{ $product->isSoldOut() ? 'disabled' : '' }}
+                                        <button type="button" {{ $detailCannotAdd ? 'disabled' : '' }}
                                                 class="btn leatherket-free-delivery-order"
                                                 onclick="buyNow({{ $product->id }})">
                                             ফ্রী ডেলিভারিতে অর্ডার করুন

@@ -14,6 +14,12 @@ class SettingController extends Controller
     }
     public function store(Request $request)
     {
+        if ($request->has('lk_newsletter_enabled')) {
+            $request->validate([
+                'lk_newsletter_enabled' => 'required|in:0,1',
+                'footer_newsletter_text' => 'nullable|string|max:255',
+            ]);
+        }
         if ($request->has('footer_open_days') || $request->has('footer_open_hours')) {
             $request->validate([
                 'footer_open_days' => 'nullable|string|max:100',
@@ -46,7 +52,7 @@ class SettingController extends Controller
                 'lk_call_button_enabled' => 'nullable|in:0,1',
             ]);
         }
-        $keys = $request->except('_token', 'lk_collection_categories');
+        $keys = $request->except('_token', 'lk_collection_categories', 'tab');
 
 
         if($request->imageID){
@@ -57,6 +63,8 @@ class SettingController extends Controller
             }
         }
 
-        return redirect('/admin/setting'.($request->query('tab') === 'collections' ? '?tab=collections' : ''));
+        $activeTab = $request->query('tab');
+        return redirect('/admin/setting'.(in_array($activeTab, ['collections', 'footer'], true) ? '?tab='.$activeTab : ''));
+
     }
 }
